@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
+        /* --- STYLES (UNCHANGED) --- */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
         body { background-color: #f1f5f9; color: #1e293b; }
 
@@ -117,7 +118,6 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Joined Date</th>
                             <th>Name</th>
                             <th>Mobile</th>
                             <th>Actions</th>
@@ -136,8 +136,6 @@
             <input type="hidden" id="e-id">
             <label>Price (₹)</label><input type="number" id="e-price" class="inp">
             <label>Address</label><input type="text" id="e-addr" class="inp">
-            <label>Owner</label><input type="text" id="e-owner" class="inp">
-            <label>Mobile</label><input type="number" id="e-mobile" class="inp">
             <div style="display:flex; gap:10px; margin-top:15px;">
                 <button class="btn btn-blue" onclick="saveEdit()">Save</button>
                 <button class="btn" style="background:#94a3b8;" onclick="closeModal()">Cancel</button>
@@ -145,48 +143,75 @@
         </div>
     </div>
 
-    <script>
-        // --- KEYS MUST MATCH USER APP ---
-        const ROOMS_KEY = 'raj_rooms_data_v2'; 
-        const USERS_LIST_KEY = 'raj_users_list';
+    <!-- FIREBASE SCRIPT -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, onValue, remove, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
-        let rooms = [], users = [];
+        // --- YOUR PROVIDED FIREBASE KEYS ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyACyhDCsfJ23x1hJ1njzkvrEmRVTN1HZ78",
+          authDomain: "rooms-20b62.firebaseapp.com",
+          databaseURL: "https://rooms-20b62-default-rtdb.firebaseio.com",
+          projectId: "rooms-20b62",
+          storageBucket: "rooms-20b62.firebasestorage.app",
+          messagingSenderId: "108894681696",
+          appId: "1:108894681696:web:1398f3749ac3c502f26105",
+          measurementId: "G-VS0FESKZVH"
+        };
 
-        // --- INSTANT SYNC LISTENER ---
-        window.addEventListener('storage', function(e) {
-            if(e.key === ROOMS_KEY || e.key === USERS_LIST_KEY) {
-                if(document.getElementById('dashboard').style.display === 'block') {
-                    refreshData();
-                }
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        let rooms = [];
+        let users = [];
+
+        // --- FIREBASE LISTENERS (Global Sync) ---
+        
+        // Sync Rooms
+        onValue(ref(db, 'rooms'), (snapshot) => {
+            const data = snapshot.val();
+            rooms = data ? Object.entries(data).map(([key, val]) => ({ id: key, ...val })).reverse() : [];
+            if(document.getElementById('dashboard').style.display === 'block') {
+                refreshData();
             }
         });
 
-        function login() {
+        // Sync Users
+        onValue(ref(db, 'users'), (snapshot) => {
+            const data = snapshot.val();
+            // Users are stored by mobile number key, converting to array
+            users = data ? Object.values(data) : [];
+            if(document.getElementById('dashboard').style.display === 'block') {
+                refreshData();
+            }
+        });
+
+        // --- GLOBAL FUNCTIONS FOR HTML ONCLICK ---
+
+        window.login = () => {
             if(document.getElementById('a-user').value === 'admin' && document.getElementById('a-pass').value === 'admin123') {
                 document.getElementById('admin-login').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
                 refreshData();
             } else { alert("Invalid Credentials!"); }
-        }
+        };
 
-        function refreshData() {
-            rooms = JSON.parse(localStorage.getItem(ROOMS_KEY)) || [];
-            users = JSON.parse(localStorage.getItem(USERS_LIST_KEY)) || [];
-            
+        window.refreshData = () => {
             document.getElementById('total-rooms').innerText = rooms.length;
             document.getElementById('total-users').innerText = users.length;
             document.getElementById('total-val').innerText = '₹' + rooms.reduce((a,c) => a+Number(c.price), 0).toLocaleString();
             
             renderRooms();
             renderUsers();
-        }
+        };
 
-        function switchTab(id, btn) {
+        window.switchTab = (id, btn) => {
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-        }
+        };
 
         function renderRooms() {
             const tbody = document.getElementById('rooms-body');
@@ -197,87 +222,75 @@
                 tr.innerHTML = `
                     <td><img src="${r.image}" class="img-thumb"></td>
                     <td><b>${r.name}</b><br><small>${r.mobile}</small></td>
-                    <td><b>₹${r.price}</b><br><small>${r.address}</small></td>
+                    <td><b>₹${r.price}</b><br><small>${r.address}</small><br>
+                        <span style="font-size:10px; background:#e0f2fe; padding:2px 5px; border-radius:3px;">${r.type || 'Room'}</span>
+                    </td>
                     <td><span style="padding:4px 8px; border-radius:4px; font-size:12px; background:${r.hidden ? '#fef08a':'#bbf7d0'}; color:${r.hidden ? '#854d0e':'#166534'}">${r.hidden ? 'Hidden':'Active'}</span></td>
                     <td class="actions">
-                        <button class="action-btn btn-warn" onclick="openEdit(${r.id})"><i class="fa-solid fa-pen"></i></button>
-                        <button class="action-btn btn-blue" onclick="toggleHide(${r.id})"><i class="fa-solid fa-eye${r.hidden?'':'-slash'}"></i></button>
-                        <button class="action-btn btn-red" onclick="deleteRoom(${r.id})"><i class="fa-solid fa-trash"></i></button>
+                        <button class="action-btn btn-warn" onclick="openEdit('${r.id}')"><i class="fa-solid fa-pen"></i></button>
+                        <button class="action-btn btn-blue" onclick="toggleHide('${r.id}', ${r.hidden})"><i class="fa-solid fa-eye${r.hidden?'':'-slash'}"></i></button>
+                        <button class="action-btn btn-red" onclick="deleteRoom('${r.id}')"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        function deleteRoom(id) {
+        window.deleteRoom = (id) => {
             if(confirm("Permanently delete this room?")) {
-                rooms = rooms.filter(r => r.id !== id);
-                localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
-                refreshData();
+                remove(ref(db, 'rooms/' + id));
             }
-        }
+        };
 
-        function toggleHide(id) {
-            const r = rooms.find(x => x.id === id);
-            if(r) { 
-                r.hidden = !r.hidden; 
-                localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms)); 
-                refreshData(); 
-            }
-        }
+        window.toggleHide = (id, currentStatus) => {
+            update(ref(db, 'rooms/' + id), { hidden: !currentStatus });
+        };
 
-        function openEdit(id) {
+        window.openEdit = (id) => {
             const r = rooms.find(x => x.id === id);
             document.getElementById('e-id').value = r.id;
             document.getElementById('e-price').value = r.price;
             document.getElementById('e-addr').value = r.address;
-            document.getElementById('e-owner').value = r.name;
-            document.getElementById('e-mobile').value = r.mobile;
             document.getElementById('edit-modal').style.display = 'flex';
-        }
+        };
 
-        function saveEdit() {
-            const id = parseInt(document.getElementById('e-id').value);
-            const idx = rooms.findIndex(r => r.id === id);
-            if(idx > -1) {
-                rooms[idx].price = document.getElementById('e-price').value;
-                rooms[idx].address = document.getElementById('e-addr').value;
-                rooms[idx].name = document.getElementById('e-owner').value;
-                rooms[idx].mobile = document.getElementById('e-mobile').value;
-                localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
-                closeModal();
-                refreshData();
-            }
-        }
-        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
+        window.saveEdit = () => {
+            const id = document.getElementById('e-id').value;
+            const updates = {
+                price: document.getElementById('e-price').value,
+                address: document.getElementById('e-addr').value
+            };
+            update(ref(db, 'rooms/' + id), updates);
+            window.closeModal();
+        };
+
+        window.closeModal = () => { document.getElementById('edit-modal').style.display = 'none'; };
 
         function renderUsers() {
             const tbody = document.getElementById('users-body');
-            tbody.innerHTML = users.length ? '' : '<tr><td colspan="4" style="text-align:center; padding:20px;">No users registered.</td></tr>';
+            tbody.innerHTML = users.length ? '' : '<tr><td colspan="3" style="text-align:center; padding:20px;">No users registered.</td></tr>';
 
             users.forEach(u => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${new Date(u.id).toLocaleDateString()}</td>
                     <td><b>${u.name}</b></td>
                     <td>${u.mobile}</td>
-                    <td><button class="action-btn btn-red" onclick="deleteUser(${u.id})"><i class="fa-solid fa-trash"></i> Delete</button></td>
+                    <td><button class="action-btn btn-red" onclick="deleteUser('${u.mobile}')"><i class="fa-solid fa-trash"></i> Delete</button></td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        function deleteUser(id) {
+        window.deleteUser = (mobileId) => {
             if(confirm("Delete this user?")) {
-                users = users.filter(u => u.id !== id);
-                localStorage.setItem(USERS_LIST_KEY, JSON.stringify(users));
-                refreshData();
+                // In this structure, users are stored by mobile number as key
+                remove(ref(db, 'users/' + mobileId));
             }
-        }
+        };
 
-        function logout() {
+        window.logout = () => {
             location.reload();
-        }
+        };
     </script>
 </body>
 </html>
