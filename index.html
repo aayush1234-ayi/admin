@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* --- STYLES (UNCHANGED) --- */
+        /* --- STYLES --- */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
         body { background-color: #f1f5f9; color: #1e293b; }
 
@@ -148,7 +148,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getDatabase, ref, onValue, remove, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
-        // --- YOUR PROVIDED FIREBASE KEYS ---
+        // --- FIREBASE CONFIG ---
         const firebaseConfig = {
           apiKey: "AIzaSyACyhDCsfJ23x1hJ1njzkvrEmRVTN1HZ78",
           authDomain: "rooms-20b62.firebaseapp.com",
@@ -166,9 +166,8 @@
         let rooms = [];
         let users = [];
 
-        // --- FIREBASE LISTENERS (Global Sync) ---
+        // --- GLOBAL LISTENERS ---
         
-        // Sync Rooms
         onValue(ref(db, 'rooms'), (snapshot) => {
             const data = snapshot.val();
             rooms = data ? Object.entries(data).map(([key, val]) => ({ id: key, ...val })).reverse() : [];
@@ -177,17 +176,15 @@
             }
         });
 
-        // Sync Users
         onValue(ref(db, 'users'), (snapshot) => {
             const data = snapshot.val();
-            // Users are stored by mobile number key, converting to array
             users = data ? Object.values(data) : [];
             if(document.getElementById('dashboard').style.display === 'block') {
                 refreshData();
             }
         });
 
-        // --- GLOBAL FUNCTIONS FOR HTML ONCLICK ---
+        // --- ADMIN LOGIC ---
 
         window.login = () => {
             if(document.getElementById('a-user').value === 'admin' && document.getElementById('a-pass').value === 'admin123') {
@@ -220,7 +217,7 @@
             rooms.forEach(r => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><img src="${r.image}" class="img-thumb"></td>
+                    <td><img src="${r.image}" class="img-thumb" loading="lazy"></td>
                     <td><b>${r.name}</b><br><small>${r.mobile}</small></td>
                     <td><b>₹${r.price}</b><br><small>${r.address}</small><br>
                         <span style="font-size:10px; background:#e0f2fe; padding:2px 5px; border-radius:3px;">${r.type || 'Room'}</span>
@@ -283,7 +280,6 @@
 
         window.deleteUser = (mobileId) => {
             if(confirm("Delete this user?")) {
-                // In this structure, users are stored by mobile number as key
                 remove(ref(db, 'users/' + mobileId));
             }
         };
